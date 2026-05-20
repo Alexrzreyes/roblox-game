@@ -18,6 +18,15 @@ export class Avatar {
     this.gravity = -28;
     this.radius = 0.5; // for collision
     this.height = 2.2;
+    this.hp = 100;
+    this.maxHp = 100;
+    
+    // Bullet state
+    this.bullets = [];
+    this.shootCooldown = 0;
+    this.shootInterval = 0.22; // every 220ms
+    this.hurtCooldown = 0;
+    this.shootAnimTimer = 0; // tracking gun firing poses
     
     // Animation timing
     this.animationTime = 0;
@@ -88,6 +97,28 @@ export class Avatar {
     rightArmMesh.castShadow = true;
     rightArmMesh.receiveShadow = true;
     this.rightArmPivot.add(rightArmMesh);
+
+    // Add a blocky gun to the right hand
+    const gunGroup = new THREE.Group();
+    // Gun body (dark grey block)
+    const gunBodyGeo = new THREE.BoxGeometry(0.18, 0.18, 0.5);
+    const gunBodyMat = new THREE.MeshLambertMaterial({ color: 0x374151 });
+    const gunBody = new THREE.Mesh(gunBodyGeo, gunBodyMat);
+    gunBody.position.set(0, -0.7, 0.15); // position it at the bottom of the hand, pointing forward
+    gunBody.castShadow = true;
+    gunBody.receiveShadow = true;
+    gunGroup.add(gunBody);
+
+    // Gun barrel (neon cyan tube/cylinder)
+    const barrelGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.3, 8);
+    const barrelMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, toneMapped: false });
+    const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+    barrel.rotation.x = Math.PI / 2; // point forward along Z
+    barrel.position.set(0, -0.7, 0.45);
+    barrel.castShadow = true;
+    gunGroup.add(barrel);
+    
+    this.rightArmPivot.add(gunGroup);
     this.group.add(this.rightArmPivot);
 
     // Left Leg
@@ -174,7 +205,88 @@ export class Avatar {
     }
   }
 
-  update(dt, controls, cameraYaw) {
+  shoot(camera) {
+    if (this.shootCooldown > 0 || this.hp <= 0) return;
+    this.shootCooldown = this.shootInterval;
+    this.shootAnimTimer = 0.4; // 400ms gun pose duration
+    
+    gameAudio.playLaser();
+    
+    // 1. Bullet direction is exactly forward relative to the avatar's body orientation (always horizontal)
+    // The avatar's face is modeled on the +Z axis, so forward is +1 on Z
+    const bulletDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion).normalize();
+
+    // 2. Muzzle position of the gun (attached to right arm)
+    // Character's right side is -X when looking along +Z
+    const rightVec = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.group.quaternion).normalize();
+
+    const muzzlePos = this.position.clone();
+    muzzlePos.y += 0.85; // height of hand holding the gun
+    muzzlePos.addScaledVector(rightVec, 0.45); // hand offset right
+    muzzlePos.addScaledVector(bulletDir, 0.6); // hand offset forward
+
+    // Create the tracer bullet (neon yellow box)
+    const bulletGeo = new THREE.BoxGeometry(0.12, 0.12, 1.2);
+    const bulletMat = new THREE.MeshBasicMaterial({
+      color: 0xfff700, // Neon yellow
+      toneMapped: false
+    });
+    const bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
+    bulletMesh.name = "bullet";
+    
+    bulletMesh.position.copy(muzzlePos);
+    bulletMesh.lookAt(muzzlePos.clone().add(bulletDir));
+    
+    this.scene.add(bulletMesh);
+
+    this.bullets.push({
+      mesh: bulletMesh,
+      velocity: bulletDir.multiplyScalar(38), // travel speed
+      life: 1.5 // seconds
+    });
+  }
+
+  takeDamage(amount) {
+    if (this.hurtCooldown > 0 || this.hp <= 0) return;
+    
+    this.hp -= amount;
+    this.hurtCooldown = 0.8; // 800ms immunity window
+    
+    gameAudio.playHurt();
+
+    // Visual damage indicator overlay
+    const overlay = document.getElementById('damage-overlay');
+    if (overlay) {
+      overlay.classList.add('flash');
+      setTimeout(() => overlay.classList.remove('flash'), 120);
+    }
+  }
+
+  update(dt, controls, cameraYaw, camera) {
+    // Cooldown updates
+    if (this.shootCooldown > 0) this.shootCooldown -= dt;
+    if (this.hurtCooldown > 0) this.hurtCooldown -= dt;
+    if (this.shootAnimTimer > 0) this.shootAnimTimer -= dt;
+
+    // Shooting input
+    if (controls.shootPressed && camera) {
+      this.shoot(camera);
+    }
+
+    // Update bullets
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const bullet = this.bullets[i];
+      bullet.mesh.position.addScaledVector(bullet.velocity, dt);
+      bullet.life -= dt;
+
+      if (bullet.life <= 0) {
+        this.scene.remove(bullet.mesh);
+        bullet.mesh.geometry.dispose();
+        bullet.mesh.material.dispose();
+        this.bullets.splice(i, 1);
+      }
+    }
+
     // 1. Calculate direction relative to camera yaw
     // controls.moveVector contains x (horizontal/strafe) and y (forward/backward)
     const isMoving = controls.moveVector.x !== 0 || controls.moveVector.y !== 0;
@@ -294,6 +406,13 @@ export class Avatar {
       this.head.rotation.x = breatheOffset * 0.5;
       this.torso.rotation.y = 0;
       this.torso.rotation.x = 0;
+    }
+
+    // Override right arm rotation to point forward if shooting/aiming
+    if (this.shootAnimTimer > 0) {
+      this.rightArmPivot.rotation.x = -Math.PI / 2;
+      this.rightArmPivot.rotation.y = 0;
+      this.rightArmPivot.rotation.z = 0;
     }
   }
 

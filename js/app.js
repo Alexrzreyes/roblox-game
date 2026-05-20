@@ -8,6 +8,7 @@ class Game {
   constructor() {
     this.canvas = document.getElementById('game-canvas');
     this.coinCount = 0;
+    this.killsCount = 0;
     
     this.initEngine();
     this.initGameObjects();
@@ -136,6 +137,30 @@ class Game {
     }
   }
 
+  onEnemyKilled() {
+    this.killsCount++;
+    const killsEl = document.getElementById('kills-count');
+    if (killsEl) {
+      killsEl.textContent = this.killsCount;
+      // Add visual bump animation
+      killsEl.parentElement.classList.add('bump');
+      setTimeout(() => {
+        killsEl.parentElement.classList.remove('bump');
+      }, 300);
+    }
+  }
+
+  updateHpUI() {
+    const hpFill = document.getElementById('hp-bar-fill');
+    const hpVal = document.getElementById('hp-value');
+    if (hpFill) {
+      hpFill.style.width = `${this.avatar.hp}%`;
+    }
+    if (hpVal) {
+      hpVal.textContent = Math.round(this.avatar.hp);
+    }
+  }
+
   onWindowResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
@@ -179,9 +204,22 @@ class Game {
       if (dt > 0.1) dt = 0.1;
 
       // Update modules
-      this.world.update(dt, this.avatar, () => this.onCoinCollected());
-      this.avatar.update(dt, this.controls, this.controls.cameraYaw);
+      this.world.update(dt, this.avatar, () => this.onCoinCollected(), () => this.onEnemyKilled());
+      this.avatar.update(dt, this.controls, this.controls.cameraYaw, this.camera);
       
+      // Handle player death
+      if (this.avatar.hp <= 0) {
+        this.avatar.hp = 100;
+        this.avatar.respawn();
+        // Lose 5 coins on death as penalty
+        this.coinCount = Math.max(0, this.coinCount - 5);
+        const countEl = document.getElementById('coin-count');
+        if (countEl) countEl.textContent = this.coinCount;
+      }
+
+      // Update Health HUD
+      this.updateHpUI();
+
       // Perform camera follow calculations
       this.updateCamera();
 

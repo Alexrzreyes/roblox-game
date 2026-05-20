@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { gameAudio } from './audio.js';
+import { Enemy } from './enemy.js';
 
 export class World {
   constructor(scene) {
@@ -9,6 +10,7 @@ export class World {
     this.platforms = [];
     this.coins = [];
     this.particles = [];
+    this.enemies = []; // Tracking active enemies
     
     this.setupEnvironment();
     this.createStage();
@@ -28,16 +30,16 @@ export class World {
 
     // Directional Light (Sun with soft shadows)
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(10, 20, 10);
+    dirLight.position.set(15, 30, 15);
     dirLight.castShadow = true;
     
     // Configure shadow map size and frustum
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
     dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 40;
+    dirLight.shadow.camera.far = 80;
     
-    const d = 15;
+    const d = 30; // Expanded shadow area for larger island
     dirLight.shadow.camera.left = -d;
     dirLight.shadow.camera.right = d;
     dirLight.shadow.camera.top = d;
@@ -61,9 +63,9 @@ export class World {
     // Color palettes for blocks
     const colors = [0x06b6d4, 0x8b5cf6, 0xec4899, 0xf59e0b]; // Cyan, Purple, Pink, Orange
 
-    // 1. Main Island (Soil base + Grass top)
-    const mainIslandWidth = 24;
-    const mainIslandDepth = 24;
+    // 1. Main Island (Soil base + Grass top) - Expanded to 48x48
+    const mainIslandWidth = 48;
+    const mainIslandDepth = 48;
     
     // Soil
     const soilGeo = new THREE.BoxGeometry(mainIslandWidth, 1.5, mainIslandDepth);
@@ -91,6 +93,23 @@ export class World {
     this.scene.add(rock1);
     this.platforms.push({ mesh: rock1, box: new THREE.Box3(), isMoving: false });
 
+    // 2b. Stone Towers (acts as platforms)
+    const tower1Geo = new THREE.BoxGeometry(4, 6, 4);
+    const tower1 = new THREE.Mesh(tower1Geo, stoneMaterial);
+    tower1.position.set(14, 3, 14);
+    tower1.castShadow = true;
+    tower1.receiveShadow = true;
+    this.scene.add(tower1);
+    this.platforms.push({ mesh: tower1, box: new THREE.Box3().setFromObject(tower1), isMoving: false });
+
+    const tower2Geo = new THREE.BoxGeometry(4, 4, 4);
+    const tower2 = new THREE.Mesh(tower2Geo, stoneMaterial);
+    tower2.position.set(-14, 2, -14);
+    tower2.castShadow = true;
+    tower2.receiveShadow = true;
+    this.scene.add(tower2);
+    this.platforms.push({ mesh: tower2, box: new THREE.Box3().setFromObject(tower2), isMoving: false });
+
     // 3. Static Floating Platforms (Staircase layout)
     const platformData = [
       { x: -7, y: 1.5, z: 6, w: 3, h: 0.5, d: 3, color: colors[0] },  // Cyan
@@ -114,7 +133,28 @@ export class World {
       });
     });
 
-    // 4. Moving Platform (Pink)
+    // 3b. Additional floating platforms connecting towers
+    const additionalPlatforms = [
+      { x: 9, y: 3.2, z: 12, w: 3, h: 0.5, d: 3, color: colors[0] },   // connects to tower 1
+      { x: 14, y: 4.8, z: 9, w: 3, h: 0.5, d: 3, color: colors[1] },
+      { x: -9, y: 2.2, z: -12, w: 3, h: 0.5, d: 3, color: colors[2] }  // connects to tower 2
+    ];
+    additionalPlatforms.forEach(data => {
+      const geo = new THREE.BoxGeometry(data.w, data.h, data.d);
+      const mat = new THREE.MeshLambertMaterial({ color: data.color });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(data.x, data.y - data.h/2, data.z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.scene.add(mesh);
+      this.platforms.push({
+        mesh: mesh,
+        box: new THREE.Box3().setFromObject(mesh),
+        isMoving: false
+      });
+    });
+
+    // 4. Moving Platform (Pink) - Longer range
     const movingGeo = new THREE.BoxGeometry(3, 0.4, 3);
     const movingMat = new THREE.MeshLambertMaterial({ color: colors[2] }); // Pink
     const movingMesh = new THREE.Mesh(movingGeo, movingMat);
@@ -128,15 +168,14 @@ export class World {
       box: new THREE.Box3().setFromObject(movingMesh),
       isMoving: true,
       startX: 4,
-      endX: 10,
-      speed: 2.2,
+      endX: 16, // longer range
+      speed: 2.5,
       direction: 1, // 1: forward, -1: backward
       dx: 0 // delta x per frame
     };
     this.platforms.push(this.movingPlatform);
 
     // 5. Ramp / Slope (Stone colored box rotated)
-    // We make a physical visual representation. Real slope physics is handled in calculation.
     const rampWidth = 3;
     const rampLength = 6;
     const rampHeight = 0.2;
@@ -144,7 +183,6 @@ export class World {
     const rampMesh = new THREE.Mesh(rampGeo, stoneMaterial);
     
     // Center of ramp between X=3 and X=9 (midpoint X=6), Z=-5
-    // Rotated around Z axis
     rampMesh.position.set(6, 0.85, -5);
     rampMesh.rotation.z = 0.3; // 17 degrees slope
     rampMesh.castShadow = true;
@@ -211,7 +249,7 @@ export class World {
     p.dx = mesh.position.x - prevX;
   }
 
-  update(dt, avatar, onCoinCollected) {
+  update(dt, avatar, onCoinCollected, onEnemyKilled) {
     // 1. Update platforms positions (moving ones)
     this.updateMovingPlatforms(dt);
 
@@ -230,6 +268,9 @@ export class World {
 
     // 5. Handle Coin Collisions
     this.checkCoinCollections(avatar, onCoinCollected);
+
+    // 6. Update shooter gameplay: enemies spawning, logic and bullet collisions
+    this.updateEnemies(dt, avatar, onEnemyKilled);
   }
 
   checkCollisions(avatar) {
@@ -241,8 +282,8 @@ export class World {
     const playerZ = avatar.position.z;
     const r = avatar.radius;
     
-    // A. Main Island Bounds check
-    const inMainIsland = Math.abs(playerX) <= 12 && Math.abs(playerZ) <= 12;
+    // A. Main Island Bounds check (Expanded to 48x48 bounds: abs(x/z) <= 24)
+    const inMainIsland = Math.abs(playerX) <= 24 && Math.abs(playerZ) <= 24;
     if (inMainIsland && playerBottom >= -0.05 && playerBottom <= 0.4 && avatar.velocity.y <= 0) {
       groundY = 0.2; // On grass top
       onAnyPlatform = true;
@@ -371,6 +412,100 @@ export class World {
         p.mesh.geometry.dispose();
         this.particles.splice(i, 1);
       }
+    }
+  }
+
+  spawnEnemy() {
+    // Generate random coordinates on the grass island
+    let x, z;
+    do {
+      // Main island is 48x48. Keep spawn within range [-20, 20]
+      x = (Math.random() - 0.5) * 40;
+      z = (Math.random() - 0.5) * 40;
+    } while (Math.sqrt(x * x + z * z) < 6); // Don't spawn right on top of the player's start position (0,0)
+
+    const enemy = new Enemy(this.scene, x, z);
+    this.enemies.push(enemy);
+  }
+
+  updateEnemies(dt, avatar, onEnemyKilled) {
+    // Maintain exactly 6 active enemies
+    while (this.enemies.length < 6) {
+      this.spawnEnemy();
+    }
+
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const enemy = this.enemies[i];
+      enemy.update(dt, avatar.position);
+
+      // Check collision with player
+      const distToPlayer = enemy.position.distanceTo(avatar.position);
+      // Torso collision y-range check (ensure both are on same height roughly)
+      const heightDiff = Math.abs(enemy.position.y - avatar.position.y);
+      
+      if (distToPlayer < (enemy.radius + avatar.radius) && heightDiff < 1.5) {
+        avatar.takeDamage(10); // deal 10 damage to player
+      }
+
+      // Check bullet collisions (avatar.bullets)
+      for (let j = avatar.bullets.length - 1; j >= 0; j--) {
+        const bullet = avatar.bullets[j];
+        const distToBullet = enemy.position.distanceTo(bullet.mesh.position);
+        
+        // Torso height check
+        const bulletHeightDiff = Math.abs(bullet.mesh.position.y - enemy.position.y);
+        
+        if (distToBullet < (enemy.radius + 0.15) && bulletHeightDiff < 1.0) {
+          // Bullet hit!
+          enemy.takeDamage(10);
+
+          // Destroy bullet
+          this.scene.remove(bullet.mesh);
+          bullet.mesh.geometry.dispose();
+          bullet.mesh.material.dispose();
+          avatar.bullets.splice(j, 1);
+
+          // Spawn hit particles
+          this.spawnEnemyHitParticles(enemy.position);
+
+          if (enemy.isDead) {
+            gameAudio.playExplosion();
+            enemy.destroy();
+            this.enemies.splice(i, 1);
+            if (onEnemyKilled) {
+              onEnemyKilled();
+            }
+            break; // Stop checking bullet collisions for this dead enemy
+          }
+        }
+      }
+    }
+  }
+
+  spawnEnemyHitParticles(pos) {
+    const particleCount = 12;
+    const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xef4444 }); // red particles
+
+    for (let i = 0; i < particleCount; i++) {
+      const p = new THREE.Mesh(geo, mat);
+      // Spawn at torso height
+      const spawnPos = pos.clone();
+      spawnPos.y += 0.4;
+      p.position.copy(spawnPos);
+      
+      const velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * 6,
+        Math.random() * 5 + 1.5,
+        (Math.random() - 0.5) * 6
+      );
+      
+      this.scene.add(p);
+      this.particles.push({
+        mesh: p,
+        velocity: velocity,
+        life: 0.5 // seconds
+      });
     }
   }
 }

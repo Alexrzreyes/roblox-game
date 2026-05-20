@@ -24,6 +24,12 @@
   <!-- 3D Canvas -->
   <canvas id="game-canvas"></canvas>
 
+  <!-- Crosshair for Shooter -->
+  <div id="crosshair"></div>
+  
+  <!-- Red screen flash on damage -->
+  <div id="damage-overlay"></div>
+
   <!-- HUD & Overlays -->
   <div id="hud-container">
     <!-- Header -->
@@ -33,6 +39,15 @@
         <h1>BloxWorld 3D</h1>
       </div>
       <div class="hud-stats">
+        <div class="stat-badge hp-badge">
+          <span class="stat-icon">❤️</span>
+          <div class="hp-bar-container"><div id="hp-bar-fill" style="width: 100%;"></div></div>
+          <span id="hp-value">100</span>
+        </div>
+        <div class="stat-badge kills-badge">
+          <span class="stat-icon">👾</span>
+          <span id="kills-count">0</span>
+        </div>
         <div class="stat-badge coin-badge">
           <span class="stat-icon">🪙</span>
           <span id="coin-count">0</span>
@@ -99,10 +114,11 @@
     <div id="instructions-panel" class="glass-panel">
       <h3>Controles</h3>
       <ul>
-        <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> - Moverse</li>
+        <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> - Moverse</li>
         <li><kbd>Espacio</kbd> - Saltar</li>
-        <li><kbd>Arrastrar Mouse</kbd> - Girar Cámara</li>
-        <li><kbd>Rueda Mouse</kbd> - Zoom</li>
+        <li><kbd>F</kbd> - Disparar</li>
+        <li><kbd>Click Izq. + Arrastrar</kbd> - Girar Cámara</li>
+        <li><kbd>Rueda</kbd> - Zoom</li>
       </ul>
     </div>
 
@@ -113,9 +129,12 @@
           <div id="joystick-handle"></div>
         </div>
       </div>
-      <button id="jump-button" class="mobile-action-btn" aria-label="Saltar">
-        <span>▲</span>
-      </button>
+      <div class="mobile-actions-wrapper">
+
+        <button id="jump-button" class="mobile-action-btn" aria-label="Saltar">
+          <span>▲</span>
+        </button>
+      </div>
     </div>
 
     <!-- Audio Control Button -->

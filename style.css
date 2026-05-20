@@ -447,3 +447,101 @@ kbd {
   display: inline-block;
   animation: coin-bounce 2s infinite ease-in-out;
 }
+
+/* --- Shooter UI Additions --- */
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#crosshair::before, #crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+  border-radius: 1px;
+}
+#crosshair::before {
+  width: 2px;
+  height: 16px;
+}
+#crosshair::after {
+  width: 16px;
+  height: 2px;
+}
+
+#damage-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-shadow: inset 0 0 100px rgba(239, 68, 68, 0);
+  pointer-events: none;
+  z-index: 99;
+  transition: box-shadow 0.12s ease-out;
+}
+#damage-overlay.flash {
+  box-shadow: inset 0 0 90px rgba(239, 68, 68, 0.85);
+}
+
+.hp-badge {
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.08);
+}
+.hp-bar-container {
+  width: 90px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+#hp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444 0%, #10b981 100%);
+  width: 100%;
+  border-radius: 4px;
+  transition: width 0.15s ease-out;
+}
+
+.kills-badge {
+  border-color: rgba(167, 139, 250, 0.2);
+  color: #c084fc;
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.08);
+}
+
+.mobile-actions-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.shoot-btn {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+.shoot-btn:active {
+  background: rgba(239, 68, 68, 0.4) !important;
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.6) !important;
+}
+
+@media (max-width: 768px) {
+  .hp-bar-container {
+    width: 60px;
+  }
+}
+

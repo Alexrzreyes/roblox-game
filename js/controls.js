@@ -10,12 +10,13 @@ export class Controls {
     // Movement inputs (normalized to -1 to 1 range)
     this.moveVector = { x: 0, y: 0 }; // x: left/right, y: forward/backward
     this.jumpPressed = false;
+    this.shootPressed = false;
     
     // Keyboard state
     this.keys = {
       w: false, a: false, s: false, d: false,
       ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false,
-      Space: false
+      Space: false, f: false
     };
 
     // Camera Orbit angles (in radians)
@@ -44,9 +45,10 @@ export class Controls {
     window.addEventListener('keyup', (e) => this.handleKeyUp(e));
 
     // 2. Mouse/Pointer Listeners for Camera Drag on Canvas
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent right click menu
     this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     window.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    window.addEventListener('pointerup', () => this.onPointerUp());
+    window.addEventListener('pointerup', (e) => this.onPointerUp(e));
     this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: true });
 
     // 3. Touch Joystick Listeners
@@ -68,6 +70,7 @@ export class Controls {
         this.jumpPressed = false;
       }, { passive: false });
     }
+
   }
 
   // --- Keyboard Handling ---
@@ -84,6 +87,10 @@ export class Controls {
     if (key === 's' || key === 'S' || code === 'KeyS') this.keys.s = true;
     if (key === 'a' || key === 'A' || code === 'KeyA') this.keys.a = true;
     if (key === 'd' || key === 'D' || code === 'KeyD') this.keys.d = true;
+    if (key === 'f' || key === 'F' || code === 'KeyF') {
+      this.keys.f = true;
+      this.shootPressed = true;
+    }
 
     if (code === 'ArrowUp') this.keys.ArrowUp = true;
     if (code === 'ArrowDown') this.keys.ArrowDown = true;
@@ -106,6 +113,10 @@ export class Controls {
     if (key === 's' || key === 'S' || code === 'KeyS') this.keys.s = false;
     if (key === 'a' || key === 'A' || code === 'KeyA') this.keys.a = false;
     if (key === 'd' || key === 'D' || code === 'KeyD') this.keys.d = false;
+    if (key === 'f' || key === 'F' || code === 'KeyF') {
+      this.keys.f = false;
+      this.shootPressed = false;
+    }
 
     if (code === 'ArrowUp') this.keys.ArrowUp = false;
     if (code === 'ArrowDown') this.keys.ArrowDown = false;
@@ -140,7 +151,8 @@ export class Controls {
 
   // --- Mouse/Pointer Handling for Camera ---
   onPointerDown(e) {
-    // Only rotate on left click (button 0) or touch pointer
+    // Right click (button 2) or touch drag to rotate camera
+    // Left click (button 0) or touch drag to rotate camera
     if (e.button === 0 || e.pointerType === 'touch') {
       this.isDraggingCamera = true;
       this.prevPointerPos.x = e.clientX;
@@ -166,7 +178,7 @@ export class Controls {
     this.cameraPitch = Math.max(-0.2, Math.min(1.2, this.cameraPitch));
   }
 
-  onPointerUp() {
+  onPointerUp(e) {
     this.isDraggingCamera = false;
   }
 
