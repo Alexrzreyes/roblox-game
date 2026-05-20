@@ -222,7 +222,7 @@ export class Avatar {
 
     const muzzlePos = this.position.clone();
     // When the arm is raised horizontally to shoot, the blaster tip is at shoulder height (Y=1.4)
-    muzzlePos.y += 1.4;
+    muzzlePos.y += 0.8;
     muzzlePos.addScaledVector(armVec, 0.8);  // Shift to the right hand position
     muzzlePos.addScaledVector(bulletDir, 1.15); // Shift forward to the tip of the blaster barrel
 
