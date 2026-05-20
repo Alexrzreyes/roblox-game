@@ -4,10 +4,10 @@ import { gameAudio } from './audio.js';
 export class Avatar {
   constructor(scene) {
     this.scene = scene;
-    
+
     // Group containing all parts of the character
     this.group = new THREE.Group();
-    
+
     // Character state
     this.position = new THREE.Vector3(0, 0.5, 0);
     this.velocity = new THREE.Vector3(0, 0, 0);
@@ -20,25 +20,25 @@ export class Avatar {
     this.height = 2.2;
     this.hp = 100;
     this.maxHp = 100;
-    
+
     // Bullet state
     this.bullets = [];
     this.shootCooldown = 0;
     this.shootInterval = 0.22; // every 220ms
     this.hurtCooldown = 0;
     this.shootAnimTimer = 0; // tracking gun firing poses
-    
+
     // Animation timing
     this.animationTime = 0;
     this.lastStepSoundTime = 0;
-    
+
     // Colors
     this.colors = {
       skin: '#ffdbac',
       torso: '#e63946',
       pants: '#1d3557'
     };
-    
+
     this.buildCharacter();
     this.scene.add(this.group);
   }
@@ -77,7 +77,7 @@ export class Avatar {
     this.group.add(this.torso);
 
     // 4. Limbs (Pivots are essential for swinging animations)
-    // Left Arm
+    // Left Arm (Anatomically character's right arm, at X=-0.8)
     this.leftArmPivot = new THREE.Group();
     this.leftArmPivot.position.set(-0.8, 1.4, 0);
     const leftArmGeo = new THREE.BoxGeometry(0.4, 0.9, 0.4);
@@ -86,19 +86,8 @@ export class Avatar {
     leftArmMesh.castShadow = true;
     leftArmMesh.receiveShadow = true;
     this.leftArmPivot.add(leftArmMesh);
-    this.group.add(this.leftArmPivot);
 
-    // Right Arm
-    this.rightArmPivot = new THREE.Group();
-    this.rightArmPivot.position.set(0.8, 1.4, 0);
-    const rightArmGeo = new THREE.BoxGeometry(0.4, 0.9, 0.4);
-    const rightArmMesh = new THREE.Mesh(rightArmGeo, this.materials.skin);
-    rightArmMesh.position.set(0, -0.35, 0);
-    rightArmMesh.castShadow = true;
-    rightArmMesh.receiveShadow = true;
-    this.rightArmPivot.add(rightArmMesh);
-
-    // Add a blocky gun to the right hand
+    // Add a blocky gun to this arm (character's right hand)
     const gunGroup = new THREE.Group();
     // Gun body (dark grey block)
     const gunBodyGeo = new THREE.BoxGeometry(0.18, 0.18, 0.5);
@@ -117,8 +106,19 @@ export class Avatar {
     barrel.position.set(0, -0.7, 0.45);
     barrel.castShadow = true;
     gunGroup.add(barrel);
-    
-    this.rightArmPivot.add(gunGroup);
+
+    this.leftArmPivot.add(gunGroup);
+    this.group.add(this.leftArmPivot);
+
+    // Right Arm (Anatomically character's left arm, at X=0.8)
+    this.rightArmPivot = new THREE.Group();
+    this.rightArmPivot.position.set(0.8, 1.4, 0);
+    const rightArmGeo = new THREE.BoxGeometry(0.4, 0.9, 0.4);
+    const rightArmMesh = new THREE.Mesh(rightArmGeo, this.materials.skin);
+    rightArmMesh.position.set(0, -0.35, 0);
+    rightArmMesh.castShadow = true;
+    rightArmMesh.receiveShadow = true;
+    this.rightArmPivot.add(rightArmMesh);
     this.group.add(this.rightArmPivot);
 
     // Left Leg
@@ -142,7 +142,7 @@ export class Avatar {
     rightLegMesh.receiveShadow = true;
     this.rightLegPivot.add(rightLegMesh);
     this.group.add(this.rightLegPivot);
-    
+
     // Set initial group height so feet are at y=0 relative to local origin
     this.group.position.copy(this.position);
   }
@@ -209,21 +209,22 @@ export class Avatar {
     if (this.shootCooldown > 0 || this.hp <= 0) return;
     this.shootCooldown = this.shootInterval;
     this.shootAnimTimer = 0.4; // 400ms gun pose duration
-    
+
     gameAudio.playLaser();
-    
+
     // 1. Bullet direction is exactly forward relative to the avatar's body orientation (always horizontal)
     // The avatar's face is modeled on the +Z axis, so forward is +1 on Z
     const bulletDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion).normalize();
 
-    // 2. Muzzle position of the gun (attached to right arm)
-    // Character's right side is -X when looking along +Z
-    const rightVec = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.group.quaternion).normalize();
+    // 2. Muzzle position of the gun (attached to character's right arm)
+    // The character's right arm pivot is located at X=-0.8 relative to body
+    const armVec = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.group.quaternion).normalize();
 
     const muzzlePos = this.position.clone();
-    muzzlePos.y += 0.85; // height of hand holding the gun
-    muzzlePos.addScaledVector(rightVec, 0.45); // hand offset right
-    muzzlePos.addScaledVector(bulletDir, 0.6); // hand offset forward
+    // When the arm is raised horizontally to shoot, the blaster tip is at shoulder height (Y=1.4)
+    muzzlePos.y += 1.4;
+    muzzlePos.addScaledVector(armVec, 0.8);  // Shift to the right hand position
+    muzzlePos.addScaledVector(bulletDir, 1.15); // Shift forward to the tip of the blaster barrel
 
     // Create the tracer bullet (neon yellow box)
     const bulletGeo = new THREE.BoxGeometry(0.12, 0.12, 1.2);
@@ -233,10 +234,10 @@ export class Avatar {
     });
     const bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
     bulletMesh.name = "bullet";
-    
+
     bulletMesh.position.copy(muzzlePos);
     bulletMesh.lookAt(muzzlePos.clone().add(bulletDir));
-    
+
     this.scene.add(bulletMesh);
 
     this.bullets.push({
@@ -248,10 +249,10 @@ export class Avatar {
 
   takeDamage(amount) {
     if (this.hurtCooldown > 0 || this.hp <= 0) return;
-    
+
     this.hp -= amount;
     this.hurtCooldown = 0.8; // 800ms immunity window
-    
+
     gameAudio.playHurt();
 
     // Visual damage indicator overlay
@@ -294,14 +295,14 @@ export class Avatar {
     if (isMoving) {
       // Calculate angle from joystick/keyboard (negate Y input so forward maps to moving in the -Z direction)
       const inputAngle = Math.atan2(controls.moveVector.x, -controls.moveVector.y);
-      
+
       // Combine with camera yaw to move in direction camera is facing
       const targetAngle = cameraYaw + inputAngle;
-      
+
       // Target velocities
       this.velocity.x = Math.sin(targetAngle) * this.speed;
       this.velocity.z = Math.cos(targetAngle) * this.speed;
-      
+
       // Smoothly rotate character to face target movement direction
       // Find shortest angular difference
       let diff = targetAngle - this.group.rotation.y;
@@ -343,7 +344,7 @@ export class Avatar {
 
   animate(dt, isMoving) {
     const horizontalSpeed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
-    
+
     if (!this.onGround) {
       // --- Jumping Animation ---
       // Arms raised, legs bent
@@ -353,7 +354,7 @@ export class Avatar {
       this.rightLegPivot.rotation.x = -0.2;
       this.head.rotation.x = -0.1;
       this.torso.rotation.x = 0;
-      
+
       this.leftArmPivot.rotation.z = -0.1;
       this.rightArmPivot.rotation.z = 0.1;
       this.group.position.y = this.position.y; // normal height
@@ -361,24 +362,24 @@ export class Avatar {
       // --- Walking Animation ---
       // Increment animation time based on movement speed
       this.animationTime += dt * horizontalSpeed * 1.5;
-      
+
       const swingAngle = Math.sin(this.animationTime) * 0.65;
-      
+
       // Opposite arm and leg swing
       this.leftArmPivot.rotation.x = swingAngle;
       this.rightArmPivot.rotation.x = -swingAngle;
       this.leftLegPivot.rotation.x = -swingAngle;
       this.rightLegPivot.rotation.x = swingAngle;
-      
+
       // Neutral Z rotation
       this.leftArmPivot.rotation.z = -0.05;
       this.rightArmPivot.rotation.z = 0.05;
-      
+
       // Subtle torso bobbing and twist
       this.group.position.y = this.position.y + Math.abs(Math.sin(this.animationTime * 2)) * 0.08;
       this.head.rotation.x = Math.sin(this.animationTime * 2) * 0.03;
       this.torso.rotation.y = Math.sin(this.animationTime) * 0.05;
-      
+
       // Footstep sound triggers (at maximum swing points)
       const swingCycle = Math.sin(this.animationTime);
       const currentTime = performance.now();
@@ -389,18 +390,18 @@ export class Avatar {
     } else {
       // --- Idle Animation (Breathing) ---
       this.animationTime += dt * 2.5;
-      
+
       const breatheOffset = Math.sin(this.animationTime) * 0.02;
-      
+
       // Reset limbs to side slowly
       this.leftArmPivot.rotation.x = THREE.MathUtils.lerp(this.leftArmPivot.rotation.x, 0, 8 * dt);
       this.rightArmPivot.rotation.x = THREE.MathUtils.lerp(this.rightArmPivot.rotation.x, 0, 8 * dt);
       this.leftLegPivot.rotation.x = THREE.MathUtils.lerp(this.leftLegPivot.rotation.x, 0, 8 * dt);
       this.rightLegPivot.rotation.x = THREE.MathUtils.lerp(this.rightLegPivot.rotation.x, 0, 8 * dt);
-      
+
       this.leftArmPivot.rotation.z = -0.05 + breatheOffset;
       this.rightArmPivot.rotation.z = 0.05 - breatheOffset;
-      
+
       // Breathe bob
       this.group.position.y = this.position.y + breatheOffset;
       this.head.rotation.x = breatheOffset * 0.5;
@@ -408,11 +409,11 @@ export class Avatar {
       this.torso.rotation.x = 0;
     }
 
-    // Override right arm rotation to point forward if shooting/aiming
+    // Override left arm rotation (character's right arm) to point forward if shooting/aiming
     if (this.shootAnimTimer > 0) {
-      this.rightArmPivot.rotation.x = -Math.PI / 2;
-      this.rightArmPivot.rotation.y = 0;
-      this.rightArmPivot.rotation.z = 0;
+      this.leftArmPivot.rotation.x = -Math.PI / 2;
+      this.leftArmPivot.rotation.y = 0;
+      this.leftArmPivot.rotation.z = 0;
     }
   }
 
