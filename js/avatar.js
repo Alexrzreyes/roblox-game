@@ -180,8 +180,8 @@ export class Avatar {
     const isMoving = controls.moveVector.x !== 0 || controls.moveVector.y !== 0;
 
     if (isMoving) {
-      // Calculate angle from joystick/keyboard
-      const inputAngle = Math.atan2(controls.moveVector.x, controls.moveVector.y);
+      // Calculate angle from joystick/keyboard (negate Y input so forward maps to moving in the -Z direction)
+      const inputAngle = Math.atan2(controls.moveVector.x, -controls.moveVector.y);
       
       // Combine with camera yaw to move in direction camera is facing
       const targetAngle = cameraYaw + inputAngle;
